@@ -160,9 +160,10 @@ default_config = {
 
 
 class MultiConfig(collections.abc.MutableMapping):
+    """A configuration class that can hold multiple values for the same key."""
+    
     def __init__(self) -> None:
         super().__init__()
-
         self._values = {}
 
     def update_from(self, other: collections.abc.Mapping, src: str):
@@ -193,3 +194,6 @@ class MultiConfig(collections.abc.MutableMapping):
 
     def __str__(self) -> str:
         return "\n".join(f"{k!r}: {v!r} ({src})" for k, v, src in self.items_with_src())
+
+# Make sure MultiConfig is available at module level
+MultiConfig = MultiConfig
