@@ -4,6 +4,8 @@ import collections.abc
 from typing import Dict, Iterator
 import warnings
 
+__all__ = ['JsonConfig', 'MultiConfig', 'check_config', 'default_config', 'find_file_recursive', 'load_env']
+
 ENV_PREFIX = "PYECOTAXA_"
 
 DEFAULT_ECOTAXA_EXPORTED_DATA_SHARE = (
