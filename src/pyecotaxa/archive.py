@@ -679,24 +679,3 @@ def add_single_image(args):
          archive.open(img_file_name, "w") as f_dst:
         shutil.copyfileobj(f_src, f_dst)
     return img_file_name
-
-
-# Create the archive and keep it open for all operations
-with Archive("export.zip", "w") as archive:
-    # First write the TSV file
-    with archive.open("phytodive_ecotaxa_export.tsv", "w") as f:
-        write_tsv(df, f)
-    
-    # Prepare arguments for parallel processing
-    src_dir = "/gpfs/work/vaswani/LPcruises/rois"
-    args = [(archive, src_dir, img_name) for img_name in df["img_file_name"]]
-    
-    # Use ThreadPoolExecutor for parallel processing
-    n_workers = 4  # Adjust based on your system
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        # Use tqdm to show progress
-        list(tqdm(
-            executor.map(add_single_image, args),
-            total=len(args),
-            desc="Adding images"
-        ))
