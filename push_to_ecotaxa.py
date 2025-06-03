@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from pyecotaxa import Remote, Transport, ImportMode
 from tqdm import tqdm
+import time
 
 def main():
     # Directory containing the archives
@@ -23,14 +24,9 @@ def main():
     print("\nLogging in...")
     remote.login(username, password)
     
-    # Get FTP credentials
-    print("\nPlease enter your FTP credentials:")
-    ftp_username = input("FTP Username: ")
-    ftp_password = input("FTP Password: ")
-    
-    # Update FTP credentials in remote config
-    remote.config["ftp_user"] = ftp_username
-    remote.config["ftp_passwd"] = ftp_password
+    # Set FTP credentials
+    remote.config["ftp_user"] = "ftp_plankton"
+    remote.config["ftp_passwd"] = "Pl@nkt0n4Ecotaxa"
     
     # Get project ID
     project_id = input("\nEnter the project ID to push to: ")
@@ -49,9 +45,35 @@ def main():
                 transport=Transport.FTP,  # Using FTP instead of HTTP
                 validate=True
             )
-            print(f"Successfully pushed {archive_path.name}")
+            
+            # Wait for import to complete
+            print(f"Waiting for import to complete for {archive_path.name}...")
+            time.sleep(30)  # Give some time for the import to start
+            
+            # Check job status
+            jobs = remote._get_jobs(
+                type="FileImport",
+                params={
+                    "prj_id": int(project_id),
+                    "req": {"source_path": str(archive_path), "update_mode": ImportMode.CREATE.value},
+                },
+            )
+            
+            if jobs:
+                job = jobs[0]
+                print(f"Job status: {job['state']}")
+                if job['state'] == 'E':  # Error state
+                    print(f"Job error: {job.get('error', 'No error message available')}")
+                elif job['state'] == 'D':  # Done state
+                    print(f"Successfully imported {archive_path.name}")
+                else:
+                    print(f"Job is still running with state: {job['state']}")
+            
         except Exception as e:
             print(f"Error pushing {archive_path.name}: {str(e)}")
+            print("Full error details:")
+            import traceback
+            traceback.print_exc()
     
     print("\nAll archives processed!")
     print("Please check the EcoTaxa web interface to verify the uploads.")
