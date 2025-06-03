@@ -76,8 +76,31 @@ def main():
     print("\nReading full TSV file...")
     df = pd.read_csv(tsv_path, sep='\t', low_memory=False)
     
+    # Drop the unnamed index column if it exists
+    if 'Unnamed: 0' in df.columns:
+        print("\nDropping unnamed index column...")
+        df = df.drop(columns=['Unnamed: 0'])
+    
+    # Find and rename all columns starting with 'obj_'
+    obj_columns = [col for col in df.columns if col.startswith('obj_')]
+    if obj_columns:
+        print("\nRenaming columns from 'obj_' to 'object_' prefix:")
+        rename_dict = {col: col.replace('obj_', 'object_', 1) for col in obj_columns}
+        for old_col, new_col in rename_dict.items():
+            print(f"- {old_col} -> {new_col}")
+        df = df.rename(columns=rename_dict)
+    
+    # Create sample_id based on unique sample_time-bin values
+    print("\nCreating sample_id column...")
+    # Create a mapping of unique sample_time-bin values to integers
+    unique_samples = df['sample_time-bin'].unique()
+    sample_id_map = {sample: i+1 for i, sample in enumerate(unique_samples)}
+    # Add the sample_id column
+    df['sample_id'] = df['sample_time-bin'].map(sample_id_map)
+    print(f"Created {len(sample_id_map)} unique sample IDs")
+    
     # Use the specific date column
-    date_column = 'obj_Date'
+    date_column = 'object_date'
     if date_column not in df.columns:
         raise ValueError(f"Column '{date_column}' not found in the TSV file")
     
@@ -101,8 +124,8 @@ def main():
                          output_dir=output_dir, 
                          image_dir=image_dir)
     
-    # Use 8 processes
-    n_processes = 8
+    # Use 16 processes
+    n_processes = 16
     print(f"\nUsing {n_processes} processes")
     
     # Process dates in parallel
