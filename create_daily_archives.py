@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 import pyecotaxa
 from tqdm import tqdm
+from multiprocessing import Pool
+from functools import partial
 
 def process_date(date, group, output_dir, image_dir):
     """Process a single date's data and create its archive."""
@@ -53,16 +55,26 @@ def process_date(date, group, output_dir, image_dir):
         print(f"Creating archive: {archive_name}")
         with pyecotaxa.Archive(archive_path, mode='w') as archive:
             # Add the TSV file with its new name
-            archive.write_member(tsv_name, tsv_path)
+            with open(tsv_path, 'rb') as f:
+                archive.write_member(tsv_name, f)
             
             # Add all images
             for img_file in tqdm(image_files, desc="Adding images to archive"):
                 if img_file not in missing_files:
                     img_path = temp_dir / img_file
-                    archive.write_member(img_file, img_path)
+                    with open(img_path, 'rb') as f:
+                        archive.write_member(img_file, f)
         
         print(f"Created archive: {archive_name}")
         print(f"Archive contains {len(group)} rows and {len(image_files) - len(missing_files)} images")
+        
+        return {
+            'date': date,
+            'archive_name': archive_name,
+            'rows': len(group),
+            'images': len(image_files) - len(missing_files),
+            'missing_images': len(missing_files)
+        }
         
     finally:
         # Clean up temporary directory
@@ -103,10 +115,37 @@ def main():
     # Path to images
     image_dir = Path('/gpfs/work/vaswani/phytodive_images')
     
-    # Group by date and process each group
-    print("\nProcessing data by date...")
-    for date, group in df.groupby(date_column):
-        process_date(date, group, output_dir, image_dir)
+    # Group by date
+    date_groups = list(df.groupby(date_column))
+    print(f"\nFound {len(date_groups)} dates to process")
+    
+    # Create a partial function with fixed arguments
+    process_func = partial(process_date, 
+                         output_dir=output_dir, 
+                         image_dir=image_dir)
+    
+    # Use 16 processes
+    n_processes = 16
+    print(f"\nUsing {n_processes} processes")
+    
+    # Process dates in parallel
+    with Pool(n_processes) as pool:
+        results = list(tqdm(
+            pool.imap(process_func, date_groups),
+            total=len(date_groups),
+            desc="Processing dates"
+        ))
+    
+    # Print summary
+    print("\nProcessing Summary:")
+    print("-" * 50)
+    for result in sorted(results, key=lambda x: x['date']):
+        print(f"Date: {result['date'].strftime('%Y-%m-%d')}")
+        print(f"Archive: {result['archive_name']}")
+        print(f"Rows processed: {result['rows']}")
+        print(f"Images processed: {result['images']}")
+        print(f"Missing images: {result['missing_images']}")
+        print("-" * 50)
     
     print("\nDone!")
 
