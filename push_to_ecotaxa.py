@@ -31,13 +31,13 @@ def main():
     for archive_path in tqdm(archive_files, desc="Uploading archives"):
         print(f"\nPushing {archive_path.name}...")
         try:
-            # Push the archive
+            # Push the archive using FTP transport for large files
             remote.push(
                 [(str(archive_path), int(project_id))],
                 n_parallel=1,
                 force=False,
                 mode=ImportMode.CREATE,
-                transport=Transport.HTTP,
+                transport=Transport.FTP,  # Using FTP instead of HTTP
                 validate=True
             )
             print(f"Successfully pushed {archive_path.name}")
