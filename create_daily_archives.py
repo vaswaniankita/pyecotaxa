@@ -64,10 +64,27 @@ def process_date(date_data, output_dir, image_dir):
 def main():
     # Read the TSV file
     tsv_path = 'final_phytodive_datatable_timebins_fps_annotation_ecotaxa.tsv'
-    df = pd.read_csv(tsv_path, sep='\t')
-
-    # Convert date column to datetime if it's not already
-    df['object_date'] = pd.to_datetime(df['object_date'])
+    
+    # First, let's check the column names
+    print("Reading TSV file...")
+    df = pd.read_csv(tsv_path, sep='\t', nrows=1)  # Read just the header
+    print("\nAvailable columns:")
+    for col in df.columns:
+        print(f"- {col}")
+    
+    # Now read the full file with low_memory=False to avoid the warning
+    print("\nReading full TSV file...")
+    df = pd.read_csv(tsv_path, sep='\t', low_memory=False)
+    
+    # Use the specific date column
+    date_column = 'obj_Date'
+    if date_column not in df.columns:
+        raise ValueError(f"Column '{date_column}' not found in the TSV file")
+    
+    print(f"\nUsing column '{date_column}' for grouping")
+    
+    # Convert date column to datetime
+    df[date_column] = pd.to_datetime(df[date_column])
 
     # Create output directory for archives
     output_dir = Path('/gpfs/work/vaswani/phytodive_daily_archives')
@@ -77,16 +94,16 @@ def main():
     image_dir = Path('/gpfs/work/vaswani/LPcruises/rois')
 
     # Group by date
-    date_groups = list(df.groupby('object_date'))
+    date_groups = list(df.groupby(date_column))
     
     # Create a partial function with fixed arguments
     process_func = partial(process_date, 
                          output_dir=output_dir, 
                          image_dir=image_dir)
     
-    # Use 8 processes (adjust this number based on your node's resources)
+    # Use 8 processes
     n_processes = 8
-    print(f"Using {n_processes} processes")
+    print(f"\nUsing {n_processes} processes")
     
     # Process dates in parallel
     with Pool(n_processes) as pool:
