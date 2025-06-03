@@ -1,4 +1,3 @@
-
 import pandas as pd
 import os
 import shutil
@@ -47,7 +46,7 @@ def process_date(date_data, output_dir, image_dir):
         with Archive(archive_path, 'w') as archive:
             # Add TSV file
             with open(tsv_file, 'rb') as f:
-                archive.write_member(f'ecotaxa_{date_str}.tsv', f)
+                archive.write_member('export.tsv', f)
 
             # Add images
             for img_file in group_df['img_file_name'].unique():
@@ -65,7 +64,7 @@ def process_date(date_data, output_dir, image_dir):
 def main():
     # Read the TSV file
     tsv_path = 'final_phytodive_datatable_timebins_fps_annotation_ecotaxa.tsv'
-        # check the column names
+    # check the column names
     print("Reading TSV file...")
     df = pd.read_csv(tsv_path, sep='\t', nrows=1)  # Read just the header
     print("\nAvailable columns:")
@@ -76,9 +75,37 @@ def main():
     print("\nReading full TSV file...")
     df = pd.read_csv(tsv_path, sep='\t', low_memory=False)
 
+    # Check for duplicates
+    print("\nChecking for duplicates...")
+    initial_rows = len(df)
+    
+    # First check for exact duplicates across all columns
+    duplicates = df.duplicated()
+    if duplicates.any():
+        print(f"Found {duplicates.sum()} exact duplicates across all columns")
+        df = df.drop_duplicates()
+    
+    # Then check for duplicates in key columns that should be unique
+    key_columns = ['img_file_name', 'object_Date', 'sample_time-bin']
+    for col in key_columns:
+        if col in df.columns:
+            duplicates = df.duplicated(subset=[col])
+            if duplicates.any():
+                print(f"Found {duplicates.sum()} duplicates in column '{col}'")
+                # Keep the first occurrence of each duplicate
+                df = df.drop_duplicates(subset=[col], keep='first')
+    
+    # Report on duplicate removal
+    final_rows = len(df)
+    if final_rows < initial_rows:
+        print(f"\nRemoved {initial_rows - final_rows} duplicate rows")
+        print(f"Final row count: {final_rows}")
+    else:
+        print("No duplicates found")
+
     if 'Unnamed: 0' in df.columns:
-    	print("\nDropping unnamed index column...")
-    	df = df.drop(columns=['Unnamed: 0'])
+        print("\nDropping unnamed index column...")
+        df = df.drop(columns=['Unnamed: 0'])
     
     # Find and rename all columns starting with 'obj_'
     obj_columns = [col for col in df.columns if col.startswith('obj_')]
@@ -120,10 +147,11 @@ def main():
 
     # Create a partial function with fixed arguments
     process_func = partial(process_date, 
-                         output_dir=output_dir, 
-                         image_dir=image_dir)
-        # Use 45 processes
-    n_processes = 45
+                          output_dir=output_dir, 
+                          image_dir=image_dir)
+
+    # Use 16 processes
+    n_processes = 16
     print(f"\nUsing {n_processes} processes")
 
     # Process dates in parallel
@@ -141,4 +169,4 @@ def main():
         print("-" * 50)
 
 if __name__ == '__main__':
-	main()
+    main()
