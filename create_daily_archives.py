@@ -8,8 +8,9 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from functools import partial
 
-def process_date(date, group, output_dir, image_dir):
+def process_date(date_data, output_dir, image_dir):
     """Process a single date's data and create its archive."""
+    date, group = date_data  # Unpack the tuple
     print(f"\nProcessing date: {date}")
     
     # Create a temporary directory for this date
