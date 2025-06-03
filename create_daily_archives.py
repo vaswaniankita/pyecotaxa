@@ -140,4 +140,5 @@ def main():
         print(f"Missing images: {n_missing}")
         print("-" * 50)
 
-	if __name__ == '__main__':
+if __name__ == '__main__':
+	main()
