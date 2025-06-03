@@ -23,6 +23,15 @@ def main():
     print("\nLogging in...")
     remote.login(username, password)
     
+    # Get FTP credentials
+    print("\nPlease enter your FTP credentials:")
+    ftp_username = input("FTP Username: ")
+    ftp_password = input("FTP Password: ")
+    
+    # Update FTP credentials in remote config
+    remote.config["ftp_user"] = ftp_username
+    remote.config["ftp_passwd"] = ftp_password
+    
     # Get project ID
     project_id = input("\nEnter the project ID to push to: ")
     
