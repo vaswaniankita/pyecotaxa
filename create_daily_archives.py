@@ -75,33 +75,20 @@ def main():
     print("\nReading full TSV file...")
     df = pd.read_csv(tsv_path, sep='\t', low_memory=False)
 
-    # Check for duplicates
-    print("\nChecking for duplicates...")
+    # Check for duplicates in img_file_name
+    print("\nChecking for duplicate image files...")
     initial_rows = len(df)
     
-    # First check for exact duplicates across all columns
-    duplicates = df.duplicated()
+    # Check for duplicates in img_file_name
+    duplicates = df.duplicated(subset=['img_file_name'])
     if duplicates.any():
-        print(f"Found {duplicates.sum()} exact duplicates across all columns")
-        df = df.drop_duplicates()
-    
-    # Then check for duplicates in key columns that should be unique
-    key_columns = ['img_file_name', 'object_Date', 'sample_time-bin']
-    for col in key_columns:
-        if col in df.columns:
-            duplicates = df.duplicated(subset=[col])
-            if duplicates.any():
-                print(f"Found {duplicates.sum()} duplicates in column '{col}'")
-                # Keep the first occurrence of each duplicate
-                df = df.drop_duplicates(subset=[col], keep='first')
-    
-    # Report on duplicate removal
-    final_rows = len(df)
-    if final_rows < initial_rows:
-        print(f"\nRemoved {initial_rows - final_rows} duplicate rows")
-        print(f"Final row count: {final_rows}")
+        print(f"Found {duplicates.sum()} duplicate image files")
+        # Keep the first occurrence of each duplicate
+        df = df.drop_duplicates(subset=['img_file_name'], keep='first')
+        print(f"Removed {initial_rows - len(df)} duplicate rows")
+        print(f"Final row count: {len(df)}")
     else:
-        print("No duplicates found")
+        print("No duplicate image files found")
 
     if 'Unnamed: 0' in df.columns:
         print("\nDropping unnamed index column...")
