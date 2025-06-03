@@ -23,6 +23,11 @@ def validate_zip_file(file_path):
             if not tsv_files:
                 return False, "Zip file does not contain any TSV files"
             
+            # Print contents of the zip file
+            print("\nZip file contents:")
+            for file in zip_ref.namelist():
+                print(f"- {file}")
+            
             return True, "Valid zip file"
     except zipfile.BadZipFile:
         return False, "File is not a valid zip file"
@@ -74,15 +79,15 @@ def main():
             remote.push(
                 [(str(archive_path), int(project_id))],
                 n_parallel=1,
-                force=False,
+                force=True,  # Force re-upload
                 mode=ImportMode.CREATE,
-                transport=Transport.FTP,  # Using FTP instead of HTTP
+                transport=Transport.FTP,
                 validate=True
             )
             print(f"Successfully pushed {archive_path.name}")
             
         except JobError as e:
-            print(f"Import job failed for {archive_path.name}:")
+            print(f"\nImport job failed for {archive_path.name}:")
             print(f"Error message: {str(e)}")
             
             # Try to get more details about the job
@@ -96,11 +101,14 @@ def main():
                 )
                 if jobs:
                     job = jobs[0]
-                    print(f"Job details:")
+                    print("\nJob details:")
                     print(f"State: {job['state']}")
                     print(f"Progress: {job.get('progress', 'N/A')}")
                     print(f"Progress message: {job.get('progress_msg', 'N/A')}")
                     print(f"Error: {job.get('error', 'N/A')}")
+                    print(f"Job ID: {job.get('id', 'N/A')}")
+                    print(f"Job type: {job.get('type', 'N/A')}")
+                    print(f"Job parameters: {job.get('params', 'N/A')}")
             except Exception as job_error:
                 print(f"Could not get job details: {str(job_error)}")
                 
