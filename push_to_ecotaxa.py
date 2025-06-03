@@ -5,6 +5,7 @@ from pyecotaxa.remote import JobError
 from tqdm import tqdm
 import time
 import zipfile
+import shutil
 
 def validate_zip_file(file_path):
     """Validate that a file is a proper zip file."""
@@ -63,6 +64,17 @@ def main():
     archive_path = archive_files[selection - 1]
     print(f"\nSelected archive: {archive_path.name}")
     
+    # Create a temporary directory for the renamed archive
+    temp_dir = Path('/tmp/ecotaxa_uploads')
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Create the new filename with 'ecotaxa_' prefix
+    new_filename = f"ecotaxa_{archive_path.name}"
+    temp_archive_path = temp_dir / new_filename
+    
+    print(f"Creating temporary archive: {new_filename}")
+    shutil.copy2(archive_path, temp_archive_path)
+    
     # Initialize Remote connection
     print("\nInitializing connection to EcoTaxa...")
     remote = Remote()
@@ -83,26 +95,28 @@ def main():
     project_id = input("\nEnter the project ID to push to: ")
     
     # Validate the zip file first
-    is_valid, message = validate_zip_file(archive_path)
+    is_valid, message = validate_zip_file(temp_archive_path)
     if not is_valid:
         print(f"Error: {message}")
+        # Clean up
+        temp_archive_path.unlink()
         return
         
-    print(f"Validating {archive_path.name}...")
+    print(f"Validating {new_filename}...")
     try:
         # Push the archive using FTP transport for large files
         remote.push(
-            [(str(archive_path), int(project_id))],
+            [(str(temp_archive_path), int(project_id))],
             n_parallel=1,
             force=True,  # Force re-upload
             mode=ImportMode.CREATE,
             transport=Transport.FTP,
             validate=True
         )
-        print(f"Successfully pushed {archive_path.name}")
+        print(f"Successfully pushed {new_filename}")
         
     except JobError as e:
-        print(f"\nImport job failed for {archive_path.name}:")
+        print(f"\nImport job failed for {new_filename}:")
         print(f"Error message: {str(e)}")
         
         # Try to get more details about the job
@@ -111,7 +125,7 @@ def main():
                 type="FileImport",
                 params={
                     "prj_id": int(project_id),
-                    "req": {"source_path": str(archive_path), "update_mode": ImportMode.CREATE.value},
+                    "req": {"source_path": str(temp_archive_path), "update_mode": ImportMode.CREATE.value},
                 },
             )
             if jobs:
@@ -140,10 +154,18 @@ def main():
             print(f"Could not get job details: {str(job_error)}")
             
     except Exception as e:
-        print(f"Error pushing {archive_path.name}: {str(e)}")
+        print(f"Error pushing {new_filename}: {str(e)}")
         print("Full error details:")
         import traceback
         traceback.print_exc()
+    
+    finally:
+        # Clean up temporary file
+        try:
+            temp_archive_path.unlink()
+            print(f"\nCleaned up temporary file: {temp_archive_path}")
+        except Exception as e:
+            print(f"Warning: Could not clean up temporary file: {e}")
 
 if __name__ == '__main__':
     main() 
