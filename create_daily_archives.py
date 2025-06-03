@@ -46,7 +46,7 @@ def process_date(date_data, output_dir, image_dir):
         with Archive(archive_path, 'w') as archive:
             # Add TSV file
             with open(tsv_file, 'rb') as f:
-                archive.write_member('export.tsv', f)
+                archive.write_member(f'ecotaxa_{date_str}.tsv', f)
 
             # Add images
             for img_file in group_df['img_file_name'].unique():
