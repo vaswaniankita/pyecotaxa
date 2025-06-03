@@ -75,8 +75,26 @@ def main():
     print("Reading TSV file...")
     df = pd.read_csv('final_phytodive_datatable_timebins_fps_annotation_ecotaxa.tsv', sep='\t', low_memory=False)
     
-    # Convert object_date to datetime
-    df['object_Date'] = pd.to_datetime(df['object_Date'])
+    # Print available columns
+    print("\nAvailable columns:")
+    for col in df.columns:
+        print(f"- {col}")
+    
+    # Find date column
+    date_columns = [col for col in df.columns if 'date' in col.lower()]
+    if not date_columns:
+        raise ValueError("No date column found in the TSV file")
+    
+    print("\nFound these potential date columns:")
+    for col in date_columns:
+        print(f"- {col}")
+    
+    # Use the first date column found
+    date_column = date_columns[0]
+    print(f"\nUsing column '{date_column}' for grouping")
+    
+    # Convert date column to datetime
+    df[date_column] = pd.to_datetime(df[date_column])
     
     # Create output directory
     output_dir = Path('/gpfs/work/vaswani/phytodive_daily_archives')
@@ -87,7 +105,7 @@ def main():
     
     # Group by date and process each group
     print("\nProcessing data by date...")
-    for date, group in df.groupby('object_date'):
+    for date, group in df.groupby(date_column):
         process_date(date, group, output_dir, image_dir)
     
     print("\nDone!")
