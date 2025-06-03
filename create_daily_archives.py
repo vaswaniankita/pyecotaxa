@@ -22,7 +22,7 @@ def process_date(date_data, output_dir, image_dir):
 
     # Create a temporary directory for this day's files
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_dir = Path(temp_dir)More actions
+        temp_dir = Path(temp_dir)
 
         # Write TSV file for this day
         tsv_file = temp_dir / f'ecotaxa_{date_str}.tsv'
@@ -76,9 +76,9 @@ def main():
     print("\nReading full TSV file...")
     df = pd.read_csv(tsv_path, sep='\t', low_memory=False)
 
-    if 'Unnamed: 0' in df.columns:Add commentMore actions
-    print("\nDropping unnamed index column...")
-    df = df.drop(columns=['Unnamed: 0'])
+    if 'Unnamed: 0' in df.columns:
+    	print("\nDropping unnamed index column...")
+    	df = df.drop(columns=['Unnamed: 0'])
     
     # Find and rename all columns starting with 'obj_'
     obj_columns = [col for col in df.columns if col.startswith('obj_')]
