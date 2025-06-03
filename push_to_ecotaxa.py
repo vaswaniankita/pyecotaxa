@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from pyecotaxa import Remote, Transport
+from pyecotaxa import Remote, Transport, ImportMode
 from tqdm import tqdm
 
 def main():
@@ -32,11 +32,13 @@ def main():
         print(f"\nPushing {archive_path.name}...")
         try:
             # Push the archive
-            remote.import_archive(
-                archive_path,
-                project_id,
-                transport=Transport.HTTP,  # Using HTTP transport
-                import_mode="append"  # Append to existing data
+            remote.push(
+                [(str(archive_path), int(project_id))],
+                n_parallel=1,
+                force=False,
+                mode=ImportMode.CREATE,
+                transport=Transport.HTTP,
+                validate=True
             )
             print(f"Successfully pushed {archive_path.name}")
         except Exception as e:
