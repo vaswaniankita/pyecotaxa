@@ -122,8 +122,8 @@ def main():
     process_func = partial(process_date, 
                          output_dir=output_dir, 
                          image_dir=image_dir)
-        # Use 16 processesAdd commentMore actions
-    n_processes = 16
+        # Use 45 processes
+    n_processes = 45
     print(f"\nUsing {n_processes} processes")
 
     # Process dates in parallel
