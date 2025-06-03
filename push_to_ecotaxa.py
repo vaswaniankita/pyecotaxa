@@ -32,7 +32,7 @@ def main():
         print(f"\nPushing {archive_path.name}...")
         try:
             # Push the archive
-            remote.push_archive(
+            remote.import_archive(
                 archive_path,
                 project_id,
                 transport=Transport.HTTP,  # Using HTTP transport
