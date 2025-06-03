@@ -76,7 +76,7 @@ def main():
     df = pd.read_csv('final_phytodive_datatable_timebins_fps_annotation_ecotaxa.tsv', sep='\t', low_memory=False)
     
     # Convert object_date to datetime
-    df['object_date'] = pd.to_datetime(df['object_date'])
+    df['object_Date'] = pd.to_datetime(df['object_Date'])
     
     # Create output directory
     output_dir = Path('/gpfs/work/vaswani/phytodive_daily_archives')
