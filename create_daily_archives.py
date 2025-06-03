@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from pyecotaxa import Archive, write_tsv
 import tempfile
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 from functools import partial
 
 def process_date(date_data, output_dir, image_dir):
@@ -84,8 +84,8 @@ def main():
                          output_dir=output_dir, 
                          image_dir=image_dir)
     
-    # Use 75% of available CPUs
-    n_processes = max(1, int(cpu_count() * 0.75))
+    # Use 8 processes (adjust this number based on your node's resources)
+    n_processes = 8
     print(f"Using {n_processes} processes")
     
     # Process dates in parallel
