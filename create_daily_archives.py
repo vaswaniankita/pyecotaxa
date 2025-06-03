@@ -100,7 +100,7 @@ def main():
     print(f"Created {len(sample_id_map)} unique sample IDs")
     
     # Use the specific date column
-    date_column = 'object_date'
+    date_column = 'object_Date'
     if date_column not in df.columns:
         raise ValueError(f"Column '{date_column}' not found in the TSV file")
     
