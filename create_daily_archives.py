@@ -8,9 +8,8 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from functools import partial
 
-def process_date(date_data, output_dir, image_dir):
+def process_date(date, group, output_dir, image_dir):
     """Process a single date's data and create its archive."""
-    date, group = date_data  # Unpack the tuple
     print(f"\nProcessing date: {date}")
     
     # Create a temporary directory for this date
@@ -116,8 +115,8 @@ def main():
     # Path to images
     image_dir = Path('/gpfs/work/vaswani/phytodive_images')
     
-    # Group by date
-    date_groups = list(df.groupby(date_column))
+    # Group by date and convert to list of tuples
+    date_groups = [(date, group) for date, group in df.groupby(date_column)]
     print(f"\nFound {len(date_groups)} dates to process")
     
     # Create a partial function with fixed arguments
@@ -132,7 +131,7 @@ def main():
     # Process dates in parallel
     with Pool(n_processes) as pool:
         results = list(tqdm(
-            pool.imap(process_func, date_groups),
+            pool.starmap(process_func, date_groups),
             total=len(date_groups),
             desc="Processing dates"
         ))
