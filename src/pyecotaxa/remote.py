@@ -15,7 +15,7 @@ import urllib.parse
 import uuid
 import warnings
 import zipfile
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, Union
 
 import requests
 import requests.adapters
@@ -119,9 +119,10 @@ def copyfile_progress(src, dst, chunksize=1024**2):
     with open(src, "rb") as fsrc:
         total = os.fstat(fsrc.fileno()).st_size
 
-        with atomic_write(dst) as fdst, tqdm(
-            unit="B", unit_scale=True, unit_divisor=1024, total=total
-        ) as pm:
+        with (
+            atomic_write(dst) as fdst,
+            tqdm(unit="B", unit_scale=True, unit_divisor=1024, total=total) as pm,
+        ):
             buf = memoryview(bytearray(chunksize))
             while 1:
                 nbytes = fsrc.readinto(buf)
@@ -212,6 +213,7 @@ class Remote:
         exported_data_share: Union[None, str, bool] = None,
         import_data_share: Union[None, str, bool] = None,
         verbose=False,
+        retry: Union[int, Literal[False]] = 3,
     ):
         super().__init__()
 
@@ -247,17 +249,22 @@ class Remote:
 
         # TODO: Use session everywhere
         self._session = requests.Session()
-        retry = urllib3.util.retry.Retry(connect=3, backoff_factor=0.5)
-        adapter = requests.adapters.HTTPAdapter(max_retries=retry)
-        self._session.mount("http://", adapter)
-        self._session.mount("https://", adapter)
+        if retry:
+            retry_cfg = urllib3.util.retry.Retry(retry, backoff_factor=0.5)
+            adapter = requests.adapters.HTTPAdapter(max_retries=retry_cfg)
+            self._session.mount("http://", adapter)
+            self._session.mount("https://", adapter)
 
         self._check_version()
 
-    def get(self, path, headers: Optional[Mapping] = None, **kwargs):
+    def _endpoint_url(self, path: str) -> str:
+        path = path.lstrip("/\\")
+        return urllib.parse.urljoin(self.config["api_endpoint"], path)
+
+    def get(self, endpoint, headers: Optional[Mapping] = None, **kwargs):
         """Get data from the specified path (retrieve)."""
         # Build url from API endpoint and supplied path
-        url = urllib.parse.urljoin(self.config["api_endpoint"], path)
+        url = self._endpoint_url(endpoint)
 
         # Build headers
         if headers is None:
@@ -271,10 +278,10 @@ class Remote:
 
         return response.json()
 
-    def post(self, path, headers: Optional[Mapping] = None, **kwargs):
+    def post(self, endpoint, headers: Optional[Mapping] = None, **kwargs):
         """Post data to the specified path (create)."""
         # Build url from API endpoint and supplied path
-        url = urllib.parse.urljoin(self.config["api_endpoint"], path)
+        url = self._endpoint_url(endpoint)
 
         # Build headers
         if headers is None:
@@ -288,10 +295,10 @@ class Remote:
 
         return response.json()
 
-    def put(self, path, headers: Optional[Mapping] = None, **kwargs):
+    def put(self, endpoint, headers: Optional[Mapping] = None, **kwargs):
         """Put data to the specified path (update)."""
         # Build url from API endpoint and supplied path
-        url = urllib.parse.urljoin(self.config["api_endpoint"], path)
+        url = self._endpoint_url(endpoint)
 
         # Build headers
         if headers is None:
@@ -300,6 +307,23 @@ class Remote:
             headers = {**self.auth_headers, **headers}
 
         response = self._session.put(url, headers=headers, **kwargs)
+
+        self._check_response(response)
+
+        return response.json()
+
+    def delete(self, endpoint, headers: Optional[Mapping] = None, **kwargs):
+        """Delete data at the specified path (delete)."""
+        # Build url from API endpoint and supplied path
+        url = self._endpoint_url(endpoint)
+
+        # Build headers
+        if headers is None:
+            headers = self.auth_headers
+        else:
+            headers = {**self.auth_headers, **headers}
+
+        response = self._session.delete(url, headers=headers, **kwargs)
 
         self._check_response(response)
 
@@ -333,6 +357,25 @@ class Remote:
 
         return api_token
 
+    def ensure_login_interactive(self):
+        """
+        Ensure that the user is logged in.
+        If not, prompt interactively for username and password.
+        """
+
+        if self.is_logged_in():
+            return
+
+        import getpass
+
+        print(
+            "Please enter your EcoTaxa credentials for {self.config['api_endpoint']}:"
+        )
+        username = input("Username: ")
+        password = getpass.getpass("Password: ")
+
+        self.login(username, password)
+
     @property
     def auth_headers(self):
         if not self.config["api_token"]:
@@ -342,20 +385,13 @@ class Remote:
 
     def _get_job(self, job_id) -> Dict:
         """Retrieve details about a job."""
-        response = requests.get(
-            urllib.parse.urljoin(self.config["api_endpoint"], f"jobs/{job_id}/"),
-            headers=self.auth_headers,
-        )
-
-        self._check_response(response)
-
-        return response.json()
+        return self.get(f"jobs/{job_id}/")
 
     def _get_job_file_http(self, project_id, job_id, *, target_directory: str) -> str:
         """Download an exported archive over HTTP and return the local file name."""
 
-        response = requests.get(
-            urllib.parse.urljoin(self.config["api_endpoint"], f"jobs/{job_id}/file"),
+        response = self._session.get(
+            self._endpoint_url(f"jobs/{job_id}/file"),
             params={},
             headers=self.auth_headers,
             stream=True,
@@ -377,13 +413,16 @@ class Remote:
         logger.info(f"Downloading {response.url} to {local_filename}...")
 
         try:
-            with tqdm(
-                unit="iB",
-                unit_scale=True,
-                unit_divisor=1024,
-                total=content_length,
-                desc=f"Downloading {name}...",
-            ) as pm, atomic_write(local_filename) as fout:
+            with (
+                tqdm(
+                    unit="iB",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    total=content_length,
+                    desc=f"Downloading {name}...",
+                ) as pm,
+                atomic_write(local_filename) as fout,
+            ):
                 for chunk in response.iter_content(chunksize):
                     fout.write(chunk)
                     pm.update(len(chunk))
@@ -435,6 +474,23 @@ class Remote:
 
         return dest_fn
 
+    def validate_ftp_config(
+        self, ftp_host=None, ftp_user=None, ftp_passwd=None, ftp_export_dir=None
+    ):
+        """Check if the FTP configuration is valid."""
+
+        ftp_host = ftp_host or self.config["ftp_host"]
+        ftp_user = ftp_user or self.config["ftp_user"]
+        ftp_passwd = ftp_passwd or self.config["ftp_passwd"]
+        ftp_export_dir = ftp_export_dir or self.config["ftp_export_dir"]
+
+        with ftplib.FTP(
+            ftp_host,
+            ftp_user,
+            ftp_passwd,
+        ) as ftp:
+            ftp.cwd(ftp_export_dir)
+
     def _get_job_file_ftp(self, project_id, job_id, *, target_directory: str) -> str:
         """Download an exported archive over FTP and return the local file name."""
 
@@ -470,13 +526,16 @@ class Remote:
                 removeprefix(filename, f"task_{job_id}_"),
             )
 
-            with tqdm(
-                unit="iB",
-                unit_scale=True,
-                unit_divisor=1024,
-                total=size,
-                desc=f"Downloading {filename}...",
-            ) as pm, atomic_write(dest_fn) as fout:
+            with (
+                tqdm(
+                    unit="iB",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    total=size,
+                    desc=f"Downloading {filename}...",
+                ) as pm,
+                atomic_write(dest_fn) as fout,
+            ):
 
                 def writeblock(block: bytes):
                     fout.write(block)
@@ -517,18 +576,13 @@ class Remote:
         raise ValueError(f"Unknown transport: {transport!r}")
 
     def _start_project_export(self, project_id, *, request: Mapping, filters: Mapping):
-        response = requests.post(
-            urllib.parse.urljoin(self.config["api_endpoint"], "object_set/export"),
+        data = self.post(
+            "object_set/export",
             json={
                 "filters": filters,
                 "request": request,
             },
-            headers=self.auth_headers,
         )
-
-        self._check_response(response)
-
-        data = response.json()
 
         job_id = data["job_id"]
 
@@ -538,15 +592,10 @@ class Remote:
         return self._get_job(job_id)
 
     def _get_jobs(self, type=None, params=None):
-        response = requests.get(
-            urllib.parse.urljoin(self.config["api_endpoint"], "jobs"),
+        jobs = self.get(
+            "jobs/",
             params={"for_admin": False},
-            headers=self.auth_headers,
         )
-
-        self._check_response(response)
-
-        jobs = response.json()
 
         if type is not None:
             jobs = [job for job in jobs if job.get("type") == type]
@@ -583,7 +632,13 @@ class Remote:
                 job = self._get_job(job["id"])
 
         if job["state"] == "E":
-            raise JobError(job["progress_msg"])
+            # Link to the job page
+            # NB: We actually want urljoin here and start the path with "/" so it is relative to the domain name.
+            job_url = urllib.parse.urljoin(
+                self.config["api_endpoint"], f"/Job/Monitor/{job['id']}"
+            )
+
+            raise JobError(job["progress_msg"] + f"\nVisit <{job_url}> for more info.")
 
         return job
 
@@ -672,13 +727,7 @@ class Remote:
 
         for job in matches:
             job_id = job["id"]
-
-            response = requests.delete(
-                urllib.parse.urljoin(self.config["api_endpoint"], f"jobs/{job_id}"),
-                headers=self.auth_headers,
-            )
-
-            self._check_response(response)
+            self.delete(f"jobs/{job_id}")
 
     def _pull_individual_project(
         self,
@@ -812,21 +861,22 @@ class Remote:
             raise
 
     def current_user(self):
-        response = requests.get(
-            urllib.parse.urljoin(self.config["api_endpoint"], "users/me"),
-            headers=self.auth_headers,
-        )
+        return self.get("users/me")
 
-        self._check_response(response)
-
-        return response.json()
+    def is_logged_in(self):
+        try:
+            self.current_user()
+            return True
+        except requests.exceptions.HTTPError as exc:
+            response = exc.response
+            if response is not None and response.status_code == 401:
+                return False
+            raise
 
     def _start_project_import(self, project_id, source_path, mode: ImportMode):
         logger.info("Starting project import...")
-        response = requests.post(
-            urllib.parse.urljoin(
-                self.config["api_endpoint"], f"file_import/{project_id}"
-            ),
+        data = self.post(
+            f"file_import/{project_id}",
             json={
                 "source_path": source_path,
                 "taxo_mappings": {},
@@ -834,12 +884,7 @@ class Remote:
                 "skip_existing_objects": True,  # Has to be True for an update (so that updateable objects are calculated)
                 "update_mode": mode.value,
             },
-            headers=self.auth_headers,
         )
-
-        self._check_response(response)
-
-        data = response.json()
 
         job_id = data["job_id"]
 
@@ -852,10 +897,7 @@ class Remote:
         # TODO: source_path = "/tmp/ecotaxa_user.{CREATOR_USER_ID}/{TAG}/{DEST_FILE_NAME}"
         return None
 
-        response = requests.get(
-            urllib.parse.urljoin(self.config["api_endpoint"], f"my_files/{fhash}"),
-            headers=self.auth_headers,
-        )
+        response = self._session.get(self._endpoint_url(f"my_files/{fhash}"))
 
         if response.status_code == 404:
             return None
@@ -915,7 +957,7 @@ class Remote:
                     me, lambda monitor: setattr(pm, "n", monitor.bytes_read)
                 )
                 response = self._session.post(
-                    urllib.parse.urljoin(self.config["api_endpoint"], f"my_files/"),
+                    self._endpoint_url(f"my_files/"),
                     data=mm,
                     headers={**self.auth_headers, "Content-Type": mm.content_type},
                 )
