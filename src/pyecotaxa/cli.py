@@ -58,7 +58,6 @@ def cli(verbose):  # pragma: no cover
     default=False,
     help="Store the API token in local .pyecotaxa.json",
 )
-@click.option("--local", "destination", flag_value="local")
 @click.option(
     "--chdir",
     "-C",

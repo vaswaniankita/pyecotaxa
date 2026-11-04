@@ -153,8 +153,9 @@ default_config = {
     "ftp_host": "plankton.obs-vlfr.fr",
     "ftp_user": "",
     "ftp_passwd": "",
-    "ftp_datadir": "/Ecotaxa_Data_to_import/pyecotaxa",
-    "ftp_export_dir": "/Ecotaxa_Exported_data",
+    # Relative to the FTP login directory
+    "ftp_datadir": "Ecotaxa_Data_to_import/pyecotaxa",
+    "ftp_export_dir": "Ecotaxa_Exported_data",
     "ftp_server_root": "FTP",
 }
 

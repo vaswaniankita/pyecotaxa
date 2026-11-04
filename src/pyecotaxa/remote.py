@@ -369,7 +369,7 @@ class Remote:
         import getpass
 
         print(
-            "Please enter your EcoTaxa credentials for {self.config['api_endpoint']}:"
+            f"Please enter your EcoTaxa credentials for {self.config['api_endpoint']}:"
         )
         username = input("Username: ")
         password = getpass.getpass("Password: ")
@@ -869,7 +869,7 @@ class Remote:
             return True
         except requests.exceptions.HTTPError as exc:
             response = exc.response
-            if response is not None and response.status_code == 401:
+            if response is not None and response.status_code in (401, 403):
                 return False
             raise
 
@@ -957,7 +957,7 @@ class Remote:
                     me, lambda monitor: setattr(pm, "n", monitor.bytes_read)
                 )
                 response = self._session.post(
-                    self._endpoint_url(f"my_files/"),
+                    self._endpoint_url("user_files/"),
                     data=mm,
                     headers={**self.auth_headers, "Content-Type": mm.content_type},
                 )
