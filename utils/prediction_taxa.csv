@@ -1,0 +1,15 @@
+prediction,taxon_id,taxon_name
+Noctiluca,78910,Noctiluca scintillans
+Copepods,25828,Copepoda
+Diatom chain,28189,Diatoma
+Marine snow,96417,marine snow
+Blurry,93926,blurry
+Pluteus larvae,93470,pluteus<Echinodermata
+Jelly,85070,gelatinous
+Chaetognates,11514,Chaetognatha
+Appendicularia,85123,Appendicularia
+Phoronida,11491,Phoronida
+Bubbles,85060,bubble
+Ctenophore,11511,Ctenophora
+Malacostraca,16622,Malacostraca
+Other,85011,other<Biota
